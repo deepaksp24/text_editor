@@ -10,7 +10,7 @@ function App() {
     setDocId(id || "default");
   }, []);
 
-  if (!docId) return null; // wait for input
+  if (!docId) return null;
 
   return <Editor docId={docId} />;
 }
