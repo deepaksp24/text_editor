@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import GridTextBox from "./GridTextBox";
 import { io } from "socket.io-client";
 
 // --- Connect to backend ---
-const socket = io("http://10.64.165.220:5000", {
+const socket = io(`http://${window.location.hostname}:5000`, {
   transports: ["websocket"],
   timeout: 5000,
 });
@@ -26,13 +27,13 @@ export default function Editor({ docId }) {
     // --- Load initial content ---
     socket.on("load", (data) => {
       console.log("📥 LOAD EVENT:", data);
-      setText(data.content);
+      setText(data);
     });
 
     // --- Receive updates from others ---
     socket.on("update", (data) => {
       console.log("📥 UPDATE EVENT:", data);
-      setText(data.content);
+      setText(data);
     });
 
     return () => {
@@ -53,13 +54,14 @@ export default function Editor({ docId }) {
   };
 
   return (
-    <textarea
+    <GridTextBox
+      rows={10}
+      cols={20}
       value={text}
-      onChange={handleChange}
-      style={{
-        width: "60vh",
-        height: "40vh",
-        fontSize: "16px",
+      onChange={(value) => {
+        setText(value);
+        console.log(value);
+        socket.emit("edit", { doc_id: docId, content: value });
       }}
     />
   );
