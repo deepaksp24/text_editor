@@ -33,11 +33,12 @@ export default function GridTextBox({ rows = 5, cols = 10, value, onChange }) {
 
   // --- 3. THE FIX: Sync state when 'value' prop changes ---
   useEffect(() => {
-    // Only update if the value actually changed to avoid cursor jumping loops
-    // (You might need deep comparison here in production, but this works for now)
-    console.log("♻️ Syncing UI with new props data");
-    setGrid(generateGrid(value));
-  }, [value, rows, cols]);
+    const newGridData = generateGrid(value);
+    if (JSON.stringify(newGridData) !== JSON.stringify(grid)) {
+      console.log("♻️ Syncing UI with new props data");
+      setGrid(newGridData);
+    }
+  }, [value, rows, cols]); 
 
   const gridToString = (g) => g.map((r) => r.join("")).join("");
 
@@ -69,14 +70,24 @@ export default function GridTextBox({ rows = 5, cols = 10, value, onChange }) {
     const key = e.key;
     const g = grid.map((row) => [...row]);
 
-    if (key === "ArrowRight")
+    if (key === "ArrowRight") {
+      e.preventDefault();
       return c < cols - 1
         ? focusCell(r, c + 1)
         : r < rows - 1 && focusCell(r + 1, 0);
-    if (key === "ArrowLeft")
+    }
+    if (key === "ArrowLeft") {
+      e.preventDefault();
       return c > 0 ? focusCell(r, c - 1) : r > 0 && focusCell(r - 1, cols - 1);
-    if (key === "ArrowUp") return r > 0 && focusCell(r - 1, c);
-    if (key === "ArrowDown") return r < rows - 1 && focusCell(r + 1, c);
+    }
+    if (key === "ArrowUp") {
+      e.preventDefault();
+      return r > 0 && focusCell(r - 1, c);
+    }
+    if (key === "ArrowDown") {
+      e.preventDefault();
+      return r < rows - 1 && focusCell(r + 1, c);
+    }
 
     if (key === "Enter") {
       e.preventDefault();
@@ -84,24 +95,40 @@ export default function GridTextBox({ rows = 5, cols = 10, value, onChange }) {
     }
 
     if (key === "Backspace") {
-      if (g[r][c] === "") {
-        if (c > 0) focusCell(r, c - 1);
-        else if (r > 0) focusCell(r - 1, cols - 1);
-        return;
+      e.preventDefault(); 
+      if (grid[r][c] !== "") {
+        updateCell(r, c, "");
       }
-      g[r][c] = "";
-      return update(g);
+
+      // 2. ALWAYS move back (Navigation)
+      // This runs for both empty and non-empty cells
+      if (c > 0) {
+        focusCell(r, c - 1);
+      } else if (r > 0) {
+        focusCell(r - 1, cols - 1);
+      }
     }
+  };
+
+  const updateCell = (r, c, newValue) => {
+    setGrid((prevGrid) => {
+      const newGrid = prevGrid.map((row) => [...row]);
+      newGrid[r][c] = newValue;
+      return newGrid;
+    });
+    onChange({
+      key: `${r},${c}`,
+      value: newValue === "" ? null : newValue,
+    });
   };
 
   const handleInput = (e, r, c) => {
     const ch = e.target.value.slice(-1);
-    const g = grid.map((row) => [...row]);
+    updateCell(r, c, ch);
 
-    g[r][c] = ch;
-    update(g);
-
-    c < cols - 1 ? focusCell(r, c + 1) : r < rows - 1 && focusCell(r + 1, 0);
+    if (ch) {
+      c < cols - 1 ? focusCell(r, c + 1) : r < rows - 1 && focusCell(r + 1, 0);
+    }
   };
 
   return (

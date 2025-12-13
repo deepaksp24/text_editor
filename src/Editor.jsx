@@ -30,10 +30,25 @@ export default function Editor({ docId }) {
       setText(data);
     });
 
-    // --- Receive updates from others ---
-    socket.on("update", (data) => {
-      console.log("📥 UPDATE EVENT:", data);
-      setText(data);
+    socket.on("update", (changes) => {
+      console.log("📥 DELTA UPDATE:", changes);
+
+      setText((prevData) => {
+        const currentMap = prevData.gridMap ? { ...prevData.gridMap } : {};
+
+        Object.entries(changes).forEach(([key, value]) => {
+          if (value === null) {
+            delete currentMap[key];
+          } else {
+            currentMap[key] = value;
+          }
+        });
+
+        return {
+          ...prevData,
+          gridMap: currentMap,
+        };
+      });
     });
 
     return () => {
@@ -58,10 +73,21 @@ export default function Editor({ docId }) {
       rows={10}
       cols={20}
       value={text}
-      onChange={(value) => {
-        setText(value);
-        console.log(value);
-        socket.emit("edit", { doc_id: docId, content: value });
+      onChange={({ key, value }) => {
+        const changes = { [key]: value };
+        console.log("Sending Change:", changes);
+        setText((prev) => {
+          const newMap = prev.gridMap ? { ...prev.gridMap } : {};
+
+          if (value === null || value === "") {
+            delete newMap[key];
+          } else {
+            newMap[key] = value;
+          }
+          return { ...prev, gridMap: newMap };
+        });
+
+        socket.emit("edit", { doc_id: docId, changes: changes });
       }}
     />
   );
