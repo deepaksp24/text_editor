@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import GridTextBox from "./GridTextBox";
 import { io } from "socket.io-client";
+import Textbox from "./Textbox";
 
 // --- Connect to backend ---
 const socket = io(`http://${window.location.hostname}:5000`, {
@@ -27,27 +28,27 @@ export default function Editor({ docId }) {
     // --- Load initial content ---
     socket.on("load", (data) => {
       console.log("📥 LOAD EVENT:", data);
-      setText(data);
+      setText(data.content);
     });
 
-    socket.on("update", (changes) => {
-      console.log("📥 DELTA UPDATE:", changes);
+    socket.on("update", (change) => {
+      setText((prev) => {
+        if (change.type === "insert") {
+          return (
+            prev.slice(0, change.position) +
+            change.character +
+            prev.slice(change.position)
+          );
+        }
 
-      setText((prevData) => {
-        const currentMap = prevData.gridMap ? { ...prevData.gridMap } : {};
+        if (change.type === "delete") {
+          return (
+            prev.slice(0, change.position) +
+            prev.slice(change.position + change.len)
+          );
+        }
 
-        Object.entries(changes).forEach(([key, value]) => {
-          if (value === null) {
-            delete currentMap[key];
-          } else {
-            currentMap[key] = value;
-          }
-        });
-
-        return {
-          ...prevData,
-          gridMap: currentMap,
-        };
+        return prev;
       });
     });
 
@@ -61,34 +62,27 @@ export default function Editor({ docId }) {
     };
   }, [docId]);
 
-  const handleChange = (e) => {
-    const value = e.target.value;
-    setText(value);
+  const handleChange = (change) => {
+    setText((prev) => {
+      if (change.type === "insert") {
+        console.log(change);
+        return (
+          prev.slice(0, change.position) +
+          change.character +
+          prev.slice(change.position)
+        );
+      }
+      if (change.type === "delete") {
+        return (
+          prev.slice(0, change.position) +
+          prev.slice(change.position + change.len)
+        );
+      }
+      return prev;
+    });
 
-    socket.emit("edit", { doc_id: docId, content: value });
+    socket.emit("edit", { doc_id: docId, changes: change });
   };
 
-  return (
-    <GridTextBox
-      rows={10}
-      cols={20}
-      value={text}
-      onChange={({ key, value }) => {
-        const changes = { [key]: value };
-        console.log("Sending Change:", changes);
-        setText((prev) => {
-          const newMap = prev.gridMap ? { ...prev.gridMap } : {};
-
-          if (value === null || value === "") {
-            delete newMap[key];
-          } else {
-            newMap[key] = value;
-          }
-          return { ...prev, gridMap: newMap };
-        });
-
-        socket.emit("edit", { doc_id: docId, changes: changes });
-      }}
-    />
-  );
+  return <Textbox value={text} onChange={handleChange} />;
 }
