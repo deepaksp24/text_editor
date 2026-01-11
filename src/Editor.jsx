@@ -11,6 +11,7 @@ const socket = io(`http://${window.location.hostname}:5000`, {
 
 export default function Editor({ docId }) {
   const [text, setText] = useState("");
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     // --- Debug logs ---
@@ -29,9 +30,12 @@ export default function Editor({ docId }) {
     socket.on("load", (data) => {
       console.log("📥 LOAD EVENT:", data);
       setText(data.content);
+      setVersion(data.version);
     });
 
-    socket.on("update", (change) => {
+    socket.on("update", (data) => {
+      let change = data.changes;
+      setVersion(data.version);
       setText((prev) => {
         if (change.type === "insert") {
           return (
@@ -81,7 +85,7 @@ export default function Editor({ docId }) {
       return prev;
     });
 
-    socket.emit("edit", { doc_id: docId, changes: change });
+    socket.emit("edit", { doc_id: docId, version, changes: change });
   };
 
   return <Textbox value={text} onChange={handleChange} />;

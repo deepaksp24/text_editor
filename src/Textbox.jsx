@@ -5,11 +5,37 @@ export default function Textbox({ value, onChange }) {
   const textareaRef = useRef(null);
   const cursorRef = useRef(0);
 
+  function findDiffPos(a, b) {
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    return i;
+  }
+
   // restore cursor after value updates (remote edits)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.selectionStart = el.selectionEnd = cursorRef.current;
+
+    let cursor = cursorRef.current;
+    const oldValue = prevValue.current;
+    const newValue = value;
+
+    // detect remote insert
+    if (newValue.length > oldValue.length) {
+      const diff = newValue.length - oldValue.length;
+      const pos = findDiffPos(oldValue, newValue);
+      if (pos <= cursor) cursor += diff;
+    }
+
+    // detect remote delete
+    if (newValue.length < oldValue.length) {
+      const diff = oldValue.length - newValue.length;
+      const pos = findDiffPos(oldValue, newValue);
+      if (pos < cursor) cursor -= diff;
+    }
+
+    cursorRef.current = cursor;
+    el.selectionStart = el.selectionEnd = cursor;
     prevValue.current = value;
   }, [value]);
 
